@@ -3,6 +3,7 @@ package abiDecoder
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"github.com/dgraph-io/badger"
 	"strings"
 	"tx-analyze/staticts"
@@ -15,6 +16,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
+var (
+	errNoFunctionCall = errors.New("input shorter than function signature")
+	errABINotMatch    = errors.New("ABI not match")
+)
+
 func SetABI(contractAbi string) (*ABIDecoder, error) {
 	myabi, err := ethabi.JSON(strings.NewReader(contractAbi))
 	if err != nil {
@@ -22,14 +28,6 @@ func SetABI(contractAbi string) (*ABIDecoder, error) {
 	}
 	return &ABIDecoder{DecABI: &myabi}, nil
 }
-
-type ABISource uint8
-
-const (
-	FromAddr ABISource = iota
-	FromFuncSig
-	FromEventSig
-)
 
 type ABIDecoder struct {
 	DecABI     *ethabi.ABI
@@ -40,10 +38,11 @@ type ABIDecoder struct {
 
 func (d *ABIDecoder) DecodeInput(txInput string) (*types.MethodData, error) {
 	//no function called
-	if len(txInput) < 10 {
-		return nil, fmt.Errorf("not call any function because input is too short")
-	}
 	txInput = strings.TrimPrefix(txInput, "0x") // skip 0x prefix
+	if len(txInput) < 8 {
+		return nil, errNoFunctionCall
+	}
+
 	decodedSig, err := hex.DecodeString(txInput[:8])
 	if err != nil {
 		return nil, err
@@ -142,7 +141,7 @@ func (d *ABIDecoder) getParamsForSingleLog(logItem *types.SingleLog) error {
 		})
 
 		for k, e := range d.DecABI.Events {
-			// 创建一个新的结构体实例
+			// log output
 			event := struct {
 				Sig string `json:"Sig"`
 				ID  string `json:"ID"`

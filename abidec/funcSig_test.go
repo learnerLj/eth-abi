@@ -12,10 +12,19 @@ import (
 	"tx-analyze/utils"
 )
 
+const (
+	badgerABI   = "../datum/dbs/abi"
+	badgersig   = "../datum/dbs/func_sig"
+	badgerEvent = "../datum/dbs/event_sig"
+
+	sigDb   = "./datum/dbs/func_sig.json"
+	eventDb = "./datum/dbs/events_sig.json"
+	abiDb   = "./datum/dbs/addr2abi.json"
+)
+
 func TestFuncSigDecoder(t *testing.T) {
 	log.SetFlags(log.Lshortfile)
 	sig := "doSomething(address,(address),(uint8,uint256),bytes)"
-	//0x5B38Da6a701c568545dCfcB03FcB875f56beddC4,[0x5B38Da6a701c568545dCfcB03FcB875f56beddC4],[240,9976],0x9afd6421
 	data := "0xfd4ca6c00000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc40000000000000000000000005b38da6a701c568545dcfcb03fcb875f56beddc400000000000000000000000000000000000000000000000000000000000000f000000000000000000000000000000000000000000000000000000000000026f800000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000049afd642100000000000000000000000000000000000000000000000000000000"
 
 	d, err := abiDecoder.ABIByFuncSig(sig)
@@ -28,13 +37,6 @@ func TestFuncSigDecoder(t *testing.T) {
 }
 
 func TestJson2Badger(t *testing.T) {
-	sigDb := "./datum/dbs/func_sig.json"
-	eventDb := "./datum/dbs/events_sig.json"
-	abiDb := "./datum/dbs/addr2abi.json"
-
-	badgerABI := "./datum/dbs/abi"
-	badgersig := "./datum/dbs/func_sig"
-	badgerEvent := "./datum/dbs/event_sig"
 
 	funcSigMap := utils.LoadFunctionSignatures(sigDb)
 	eventSigMap := utils.LoadEventSignatures(eventDb)
@@ -103,4 +105,21 @@ func TestJson2Badger(t *testing.T) {
 	wg.Wait()
 
 	fmt.Println("finished")
+}
+
+func TestEventSIg(t *testing.T) {
+	var d abiDecoder.ABIDecoder
+	d.OpenDBs([]string{badgerABI, badgersig, badgerEvent})
+
+	eventHash := "0x0000000008eb2ce0f0e5bde6b515488cb50d59e65e32f4d9f9d46a288dc72423"
+	eventSig, _ := d.ReadEventSig(eventHash)
+	fmt.Println(eventSig)
+
+	funcSel := "0x00005b67"
+	funcSig, _ := d.ReadFuncSig(funcSel)
+	fmt.Println(funcSig)
+
+	addr := "0x00000000000015bF55A34241Bbf73Ec4f4b080B2"
+	abi, _ := d.ReadABI(addr)
+	fmt.Println(abi)
 }

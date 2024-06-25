@@ -12,6 +12,9 @@ type FuncSigTypes struct {
 }
 
 func ParseFunctionSignature(signature string) ([]FunctionSignature, error) {
+	//TODO: multiple nested struct, like
+	// the parser method is a bit too simple
+
 	re := regexp.MustCompile(`(\w+)\((.*)\)`)
 	matches := re.FindStringSubmatch(signature)
 
