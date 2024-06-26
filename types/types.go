@@ -50,8 +50,8 @@ type SingleLog struct {
 	Address        string       `json:"address"`
 	Topics         []string     `json:"topics"`
 	Data           string       `json:"data"`
-	EventSignature string       `json:"eventSignature,omitempty"`
-	Params         []*ParamData `json:"parameters,omitempty"`
+	EventSignature string       `json:"eventSignature"`
+	Params         []*ParamData `json:"parameters"`
 }
 
 type ParamData struct {
@@ -61,8 +61,8 @@ type ParamData struct {
 }
 type MethodData struct {
 	Name         string      `json:"name"`
-	InputParams  []ParamData `json:"inputParams,omitempty"`
-	OutputParams []ParamData `json:"outputParams,omitempty"`
+	InputParams  []ParamData `json:"inputParams"`
+	OutputParams []ParamData `json:"outputParams"`
 }
 
 func (s SingleLog) MarshalJSON() ([]byte, error) {

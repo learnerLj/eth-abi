@@ -2,7 +2,6 @@ package abiDecoder
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"github.com/dgraph-io/badger"
 	"strings"
@@ -19,6 +18,11 @@ import (
 var (
 	errNoFunctionCall = errors.New("input shorter than function signature")
 	errABINotMatch    = errors.New("ABI not match")
+
+	errNoEventId                  = errors.New("anonymous event has no signature")
+	errEventIdLength              = errors.New("event signature not 32 bytes")
+	errEventMismatch              = errors.New("event mismatch for data")
+	errEventIndexedNumberMismatch = errors.New("indexed parameters' number mismatch")
 )
 
 func SetABI(contractAbi string) (*ABIDecoder, error) {
@@ -117,57 +121,43 @@ func (d *ABIDecoder) DecodeOutput(funcData *types.MethodData, funcSig, txOutput 
 	return nil
 }
 
-func (d *ABIDecoder) getParamsForSingleLog(logItem *types.SingleLog) error {
-	if len(logItem.Topics) == 0 {
-		return fmt.Errorf("anonymous event has no signature")
+func (d *ABIDecoder) DecodeEvent(data string, topics []string) (string, []*types.ParamData, error) {
+	if len(topics) == 0 {
+		return "", nil, errNoEventId
 	}
+
 	var eventId [32]byte
-	idHex := logItem.Topics[0]
+	idHex := topics[0]
 	idBytes, err := hex.DecodeString(idHex[2:])
 	if err != nil {
-		log.Fatal(err)
+		return "", nil, err
 	}
 	if len(idBytes) == 32 {
 		copy(eventId[:], idBytes)
 	} else {
-		log.Fatalf("event id should be 32 bytes. Event id(Topic[0]): %s", idHex)
+		return "", nil, errEventIdLength
 	}
-
 	event, err := d.DecABI.EventByID(common.Hash(idBytes))
 	if err != nil {
-		printEvent := make(map[string]struct {
-			Sig string `json:"Sig"`
-			ID  string `json:"ID"`
-		})
-
-		for k, e := range d.DecABI.Events {
-			// log output
-			event := struct {
-				Sig string `json:"Sig"`
-				ID  string `json:"ID"`
-			}{
-				ID:  e.ID.Hex(),
-				Sig: e.Sig,
-			}
-			printEvent[k] = event
-		}
-		b, _ := json.MarshalIndent(printEvent, "", "  ")
-		return fmt.Errorf("no such event in ABI. Provided:\n%s\nbut meet event id: %s", string(b), idHex)
+		return "", nil, errABINotMatch
 	}
 
-	data, err := hex.DecodeString(logItem.Data[2:])
+	//data, err := hex.DecodeString(logItem.Data[2:])
+	dataBytes, err := hex.DecodeString(strings.TrimPrefix(data, "0x"))
 	if err != nil {
-		log.Fatal(err)
+		return "", nil, err
 	}
-	dataList, err := d.DecABI.Unpack(event.Name, data)
+	dataList, err := d.DecABI.Unpack(event.Name, dataBytes)
 
 	if err != nil {
-		return fmt.Errorf("%v\nEvent %s whoes id is %s with data %s", err, event.Sig, idHex, logItem.Data)
+		return "", nil, errEventMismatch
+		//return fmt.Errorf("%v\nEvent %s whoes id is %s with data %s", err, event.Sig, idHex, logItem.Data)
 	}
 	// if the number of indexed parameters and the number of non-indexed parameters do not sum up to the number of
 	// parameters of the event in ABI, the called contract does not match the abi.
-	if len(logItem.Topics)-1 != len(event.Inputs)-len(dataList) {
-		return fmt.Errorf("indexed parameters with in log is %v but expect %v in ABI", len(logItem.Topics)-1, len(event.Inputs)-len(dataList))
+	if len(topics)-1 != len(event.Inputs)-len(dataList) {
+		return "", nil, errEventIndexedNumberMismatch
+		//return fmt.Errorf("indexed parameters with in log is %v but expect %v in ABI", len(logItem.Topics)-1, len(event.Inputs)-len(dataList))
 	}
 
 	params := make([]*types.ParamData, 0, len(event.Inputs))
@@ -178,7 +168,8 @@ func (d *ABIDecoder) getParamsForSingleLog(logItem *types.SingleLog) error {
 
 		var value interface{}
 		if input.Indexed {
-			value = logItem.Topics[topicIndex]
+			//value = logItem.Topics[topicIndex]
+			value = topics[topicIndex]
 			topicIndex++
 		} else {
 			value = dataList[dataIndex]
@@ -189,8 +180,18 @@ func (d *ABIDecoder) getParamsForSingleLog(logItem *types.SingleLog) error {
 		params = append(params, param)
 	}
 
+	return event.Sig, params, nil
+
+}
+
+func (d *ABIDecoder) getParamsForSingleLog(logItem *types.SingleLog) error {
+
+	sig, params, err := d.DecodeEvent(logItem.Data, logItem.Topics)
+	if err != nil {
+		return err
+	}
 	logItem.Params = params
-	logItem.EventSignature = event.Sig
+	logItem.EventSignature = sig
 
 	return nil
 }
