@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	abiDecoder "tx-analyze/abidec"
 	"tx-analyze/staticts"
 	"tx-analyze/types"
 	"tx-analyze/utils"
@@ -12,19 +13,11 @@ import (
 	cmap "github.com/orcaman/concurrent-map/v2"
 )
 
-var funcSigMap map[string][]string
-var addrABIMap map[string]string
-var eventSigMap map[string]string
-
-func MakeGraph(fromDir, toDir, signatureDbPath, eventDbPath, abiDbPath string,
+func MakeGraph(fromDir, toDir string, abidb *abiDecoder.ABIDB,
 	maxConcurrentFiles, maxConcurrentTx int, dryRun bool) {
-	utils.Init()
 
 	log.SetFlags(log.Lshortfile)
 
-	funcSigMap = utils.LoadFunctionSignatures(signatureDbPath)
-	eventSigMap = utils.LoadEventSignatures(eventDbPath)
-	addrABIMap = utils.LoadABIs(abiDbPath)
 	log.Println("loaded function signature, event signature and ABI databases")
 
 	semaphore := make(chan struct{}, maxConcurrentFiles)
@@ -47,7 +40,7 @@ func MakeGraph(fromDir, toDir, signatureDbPath, eventDbPath, abiDbPath string,
 			//`txHash` -> `Graph`
 			txsGraph := cmap.New[types.Graph]()
 
-			scanFile(sp, &txsGraph, maxConcurrentTx)
+			scanFile(sp, &txsGraph, maxConcurrentTx, abidb)
 
 			if !dryRun {
 				if err = utils.GraphToFile(&txsGraph, writeTo); err != nil {
@@ -63,7 +56,7 @@ func MakeGraph(fromDir, toDir, signatureDbPath, eventDbPath, abiDbPath string,
 	wg.Wait()
 
 	if err != nil {
-		log.Printf("遍历目录时发生错误：%v\n", err)
+		log.Println(err)
 	}
 
 	log.Println("All works are done!")

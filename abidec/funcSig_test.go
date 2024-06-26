@@ -42,7 +42,7 @@ func TestJson2Badger(t *testing.T) {
 	eventSigMap := utils.LoadEventSignatures(eventDb)
 	addrABIMap := utils.LoadABIs(abiDb)
 
-	var d abiDecoder.ABIDecoder
+	var d abiDecoder.ABIDB
 	d.OpenDBs([]string{badgerABI, badgersig, badgerEvent})
 
 	var sem = make(chan struct{}, 200)
@@ -108,7 +108,7 @@ func TestJson2Badger(t *testing.T) {
 }
 
 func TestEventSIg(t *testing.T) {
-	var d abiDecoder.ABIDecoder
+	var d abiDecoder.ABIDB
 	d.OpenDBs([]string{badgerABI, badgersig, badgerEvent})
 
 	eventHash := "0x0000000008eb2ce0f0e5bde6b515488cb50d59e65e32f4d9f9d46a288dc72423"

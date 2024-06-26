@@ -21,7 +21,21 @@ var (
 	errEventNotFound = errors.New("event signature not found")
 )
 
-func (d *ABIDecoder) LoadABIFromAddr(addr string) (*ethabi.ABI, error) {
+type ABISource uint8
+
+const (
+	FromAddr = iota
+	FromFuncSig
+	FromEventSig
+)
+
+type ABIDB struct {
+	ABIDb      *badger.DB
+	FuncSigDb  *badger.DB
+	EventSigDb *badger.DB
+}
+
+func (d *ABIDB) LoadABIFromAddr(addr string) (*ethabi.ABI, error) {
 	abiStr, err := d.ReadABI(addr)
 	if err != nil {
 		return nil, errABINotFound
@@ -33,7 +47,7 @@ func (d *ABIDecoder) LoadABIFromAddr(addr string) (*ethabi.ABI, error) {
 	return &myabi, nil
 }
 
-func (d *ABIDecoder) LoadABIFromFuncSig(funcSelector string) ([]*ethabi.ABI, error) {
+func (d *ABIDB) LoadABIFromFuncSig(funcSelector string) ([]*ethabi.ABI, error) {
 	funcSigStrs, err := d.ReadFuncSig(funcSelector)
 	if err != nil {
 		return nil, errFuncSigNotFound
@@ -58,19 +72,19 @@ func (d *ABIDecoder) LoadABIFromFuncSig(funcSelector string) ([]*ethabi.ABI, err
 	return abis, nil
 }
 
-func (d *ABIDecoder) LoadABIFromEventSig(eventHash string) (*ethabi.ABI, error) {
+func (d *ABIDB) LoadABIFromEventSig(eventHash string) (*ethabi.ABI, error) {
 	eventSig, err := d.ReadEventSig(eventHash)
 	if err != nil {
 		return nil, errEventNotFound
 	}
 	fmt.Println(eventSig)
 	//TODO: convert event signature to json-ABI
-	return nil, nil
+	return nil, errors.New("not implement")
 
 }
 
 // abi, funcsig, eventsig
-func (d *ABIDecoder) OpenDBs(dbPath []string) {
+func (d *ABIDB) OpenDBs(dbPath []string) {
 	for i, path := range dbPath {
 		db, err := badger.Open(badger.DefaultOptions(path))
 		if err != nil {
@@ -89,13 +103,13 @@ func (d *ABIDecoder) OpenDBs(dbPath []string) {
 	}
 }
 
-func (d *ABIDecoder) CloseDBs() {
+func (d *ABIDB) CloseDBs() {
 	d.ABIDb.Close()
 	d.FuncSigDb.Close()
 	d.EventSigDb.Close()
 }
 
-func (d *ABIDecoder) ReadABI(addr string) (string, error) {
+func (d *ABIDB) ReadABI(addr string) (string, error) {
 	b, err := d.badgerRead(d.ABIDb, addr)
 	if err != nil {
 		return "", err
@@ -110,7 +124,7 @@ func (d *ABIDecoder) ReadABI(addr string) (string, error) {
 	return abiStr, nil
 }
 
-func (d *ABIDecoder) WriteABI(key, value string) error {
+func (d *ABIDB) WriteABI(key, value string) error {
 	b, err := utils.ToGobBytes(value)
 	if err != nil {
 		return err
@@ -118,7 +132,7 @@ func (d *ABIDecoder) WriteABI(key, value string) error {
 	return d.badgerWrite(d.ABIDb, key, b)
 }
 
-func (d *ABIDecoder) ReadFuncSig(key string) ([]string, error) {
+func (d *ABIDB) ReadFuncSig(key string) ([]string, error) {
 	b, err := d.badgerRead(d.FuncSigDb, key)
 	if err != nil {
 		return nil, err
@@ -133,7 +147,7 @@ func (d *ABIDecoder) ReadFuncSig(key string) ([]string, error) {
 	return funcSigStr, nil
 }
 
-func (d *ABIDecoder) WriteFuncSig(key string, value []string) error {
+func (d *ABIDB) WriteFuncSig(key string, value []string) error {
 	b, err := utils.ToGobBytes(value)
 	if err != nil {
 		return err
@@ -141,7 +155,7 @@ func (d *ABIDecoder) WriteFuncSig(key string, value []string) error {
 	return d.badgerWrite(d.FuncSigDb, key, b)
 }
 
-func (d *ABIDecoder) ReadEventSig(key string) (string, error) {
+func (d *ABIDB) ReadEventSig(key string) (string, error) {
 	b, err := d.badgerRead(d.EventSigDb, key)
 	if err != nil {
 		return "", err
@@ -155,7 +169,7 @@ func (d *ABIDecoder) ReadEventSig(key string) (string, error) {
 	return eventSigStr, nil
 }
 
-func (d *ABIDecoder) WriteEventSig(key, value string) error {
+func (d *ABIDB) WriteEventSig(key, value string) error {
 	b, err := utils.ToGobBytes(value)
 	if err != nil {
 		return err
@@ -163,7 +177,7 @@ func (d *ABIDecoder) WriteEventSig(key, value string) error {
 	return d.badgerWrite(d.EventSigDb, key, b)
 }
 
-func (d *ABIDecoder) badgerRead(db *badger.DB, key string) ([]byte, error) {
+func (d *ABIDB) badgerRead(db *badger.DB, key string) ([]byte, error) {
 	var value []byte
 	err := db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
@@ -179,7 +193,7 @@ func (d *ABIDecoder) badgerRead(db *badger.DB, key string) ([]byte, error) {
 	return value, err
 }
 
-func (d *ABIDecoder) badgerWrite(db *badger.DB, key string, value []byte) error {
+func (d *ABIDB) badgerWrite(db *badger.DB, key string, value []byte) error {
 	return db.Update(func(txn *badger.Txn) error {
 		return txn.Set([]byte(key), value)
 	})

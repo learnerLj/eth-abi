@@ -12,7 +12,7 @@ type FuncSigTypes struct {
 }
 
 func ParseFunctionSignature(signature string) ([]FunctionSignature, error) {
-	//TODO: multiple nested struct, like
+	//TODO: multiple nested struct
 	// the parser method is a bit too simple
 
 	re := regexp.MustCompile(`(\w+)\((.*)\)`)
@@ -55,7 +55,7 @@ type FunctionSignature struct {
 	Inputs []FuncSigTypes `json:"inputs,omitempty"`
 }
 
-func ABIByFuncSig(funcSig string) (*ABIDecoder, error) {
+func ABIByFuncSig(funcSig string) (*ABIDec, error) {
 	abis, err := ParseFunctionSignature(funcSig)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing function signature: %v", err)

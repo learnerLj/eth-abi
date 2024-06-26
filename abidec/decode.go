@@ -3,7 +3,6 @@ package abiDecoder
 import (
 	"encoding/hex"
 	"errors"
-	"github.com/dgraph-io/badger"
 	"strings"
 	"tx-analyze/staticts"
 	"tx-analyze/types"
@@ -16,7 +15,7 @@ import (
 )
 
 var (
-	errNoFunctionCall = errors.New("input shorter than function signature")
+	errNoFunctionCall = errors.New("input shorter than function selector")
 	errABINotMatch    = errors.New("ABI not match")
 
 	errNoEventId                  = errors.New("anonymous event has no signature")
@@ -25,22 +24,19 @@ var (
 	errEventIndexedNumberMismatch = errors.New("indexed parameters' number mismatch")
 )
 
-func SetABI(contractAbi string) (*ABIDecoder, error) {
+func SetABI(contractAbi string) (*ABIDec, error) {
 	myabi, err := ethabi.JSON(strings.NewReader(contractAbi))
 	if err != nil {
 		return nil, fmt.Errorf("invalid ABI, %v", err)
 	}
-	return &ABIDecoder{DecABI: &myabi}, nil
+	return &ABIDec{DecABI: &myabi}, nil
 }
 
-type ABIDecoder struct {
-	DecABI     *ethabi.ABI
-	ABIDb      *badger.DB
-	FuncSigDb  *badger.DB
-	EventSigDb *badger.DB
+type ABIDec struct {
+	DecABI *ethabi.ABI
 }
 
-func (d *ABIDecoder) DecodeInput(txInput string) (*types.MethodData, error) {
+func (d *ABIDec) DecodeInput(txInput string) (*types.MethodData, error) {
 	//no function called
 	txInput = strings.TrimPrefix(txInput, "0x") // skip 0x prefix
 	if len(txInput) < 8 {
@@ -81,7 +77,7 @@ func (d *ABIDecoder) DecodeInput(txInput string) (*types.MethodData, error) {
 	return &retData, nil
 }
 
-func (d *ABIDecoder) DecodeOutput(funcData *types.MethodData, funcSig, txOutput string) error {
+func (d *ABIDec) DecodeOutput(funcData *types.MethodData, funcSig, txOutput string) error {
 	funcSig = strings.TrimPrefix(funcSig, "0x")
 	//no function called
 	if len(funcSig) < 8 {
@@ -121,7 +117,7 @@ func (d *ABIDecoder) DecodeOutput(funcData *types.MethodData, funcSig, txOutput 
 	return nil
 }
 
-func (d *ABIDecoder) DecodeEvent(data string, topics []string) (string, []*types.ParamData, error) {
+func (d *ABIDec) DecodeEvent(data string, topics []string) (string, []*types.ParamData, error) {
 	if len(topics) == 0 {
 		return "", nil, errNoEventId
 	}
@@ -184,7 +180,7 @@ func (d *ABIDecoder) DecodeEvent(data string, topics []string) (string, []*types
 
 }
 
-func (d *ABIDecoder) getParamsForSingleLog(logItem *types.SingleLog) error {
+func (d *ABIDec) ParamsForSingleLog(logItem *types.SingleLog) error {
 
 	sig, params, err := d.DecodeEvent(logItem.Data, logItem.Topics)
 	if err != nil {
@@ -196,13 +192,13 @@ func (d *ABIDecoder) getParamsForSingleLog(logItem *types.SingleLog) error {
 	return nil
 }
 
-func (d *ABIDecoder) ParamsForLogs(logItems []*types.SingleLog) {
+func (d *ABIDec) ParamsForLogs(logItems []*types.SingleLog) {
 	for _, logItem := range logItems {
 		// staticts.TotalEvent++
 
 		//If it cannot be resolved, it will remain intact because there may be an ABI defect.
 		//Otherwise, parameters and signatures are parsed
-		if err := d.getParamsForSingleLog(logItem); err != nil {
+		if err := d.ParamsForSingleLog(logItem); err != nil {
 			log.Println(err, "\ncontract address: ", logItem.Address)
 			staticts.ABIExistCallLegalEventFailed++
 		}

@@ -162,10 +162,6 @@ func ABIToFile(jsonMap map[string]string, toPath string) error {
 	return nil
 }
 
-func Init() {
-
-}
-
 func unescapeString(input string) string {
 	// 替换转义的引号，但保留 "" 为空字符串
 	re := regexp.MustCompile(`\\n|\\\\`)

@@ -1,15 +1,26 @@
 package main
 
-import "tx-analyze/txgraph"
+import (
+	"path/filepath"
+	abiDecoder "tx-analyze/abidec"
+	"tx-analyze/txgraph"
+)
 
 func main() {
 	fromDir := "./datum/txs/labeled"
 	toDir := "./datum/txs/results"
 
-	sigDb := "./datum/dbs/func_sig.json"
-	eventDb := "./datum/dbs/events_sig.json"
-	abiDb := "./datum/dbs/addr2abi.json"
+	dbBaseDir := "/root/eth/eth-abi/datum/dbs"
+	dbDir := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		dbDir[0] = filepath.Join(dbBaseDir, "abi")
+		dbDir[1] = filepath.Join(dbBaseDir, "func_sig")
+		dbDir[2] = filepath.Join(dbBaseDir, "event_sig")
+	}
 
-	txgraph.MakeGraph(fromDir, toDir, sigDb, eventDb, abiDb, 20, 200, true)
+	var d abiDecoder.ABIDB
+	d.OpenDBs(dbDir)
+
+	txgraph.MakeGraph(fromDir, toDir, &d, 20, 200, false)
 
 }
